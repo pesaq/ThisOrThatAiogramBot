@@ -32,15 +32,15 @@ class DataBaseHelper:
                 user = result.scalar_one_or_none()
 
                 if user is None:
-                    new_user = User(id=id, voted='', report_block=False, admin=False)
+                    new_user = User(id=id, voted='', report_block=False, create_block=False, admin=False)
                     session.add(new_user)
                 
                 await session.commit()
     
-    async def create_question(self, option1: str, option2: str):
+    async def create_question(self, option1: str, option2: str, creator_id: int):
         async with self.session_factory() as session:
             async with session.begin():
-                new_question = Questions(option1=option1, option2=option2, option1_points=0, option2_points=0)
+                new_question = Questions(option1=option1, option2=option2, option1_points=0, option2_points=0, creator_id=creator_id)
                 session.add(new_question)
             await session.commit()
 
@@ -91,6 +91,7 @@ class DataBaseHelper:
                             'id': user.id,
                             'voted': user.voted.split(':'),
                             'report_block': user.report_block,
+                            'create_block': user.create_block,
                             'admin': user.admin
                         }
                     else:
@@ -98,22 +99,11 @@ class DataBaseHelper:
                             'id': user.id,
                             'voted': user.voted,
                             'report_block': user.report_block,
+                            'create_block': user.create_block,
                             'admin': user.admin
                         }
                 else:
-                    return None      
-    
-    async def get_question_voices(self, question_id: int):
-        async with self.session_factory() as session:
-            async with session.begin(): 
-                result = await session.execute(
-                    select(Questions).where(Questions.id == question_id)
-                )
-                question = result.scalar_one_or_none()
-
-                if question:
-                    return [question.option1_points, question.option2_points]
-                return None
+                    return None
     
     async def get_question_info(self, question_id):
         async with self.session_factory() as session:
@@ -129,7 +119,8 @@ class DataBaseHelper:
                         'option1': question.option1,
                         'option2': question.option2,
                         'option1_points': question.option1_points,
-                        'option2_points': question.option2_points
+                        'option2_points': question.option2_points,
+                        'creator_id': question.creator_id
                     }
                 return None
     
@@ -162,5 +153,27 @@ class DataBaseHelper:
 
                 if user:
                     user.report_block = False
+    
+    async def block_create_user(self, id: int):
+        async with self.session_factory() as session:
+            async with session.begin():
+                result = await session.execute(
+                    select(User).where(User.id == id)
+                )
+                user = result.scalar_one_or_none()
+
+                if user:
+                    user.create_block = True
+
+    async def unblock_create_user(self, id: int):
+        async with self.session_factory() as session:
+            async with session.begin():
+                result = await session.execute(
+                    select(User).where(User.id == id)
+                )
+                user = result.scalar_one_or_none()
+
+                if user:
+                    user.create_block = False
     
 db_helper = DataBaseHelper(url=settings.db_url, echo=settings.db_echo)

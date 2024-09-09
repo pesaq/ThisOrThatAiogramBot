@@ -15,6 +15,10 @@ class QuestionParams(StatesGroup):
 @router.message(Command(commands=['create_question']))
 async def create_question(message: Message, state: FSMContext):
     await db_helper.create_user(id=message.from_user.id)
+    user_info = await db_helper.get_user_info(id=message.from_user.id)
+    if user_info['create_block'] is True:
+        await message.answer(f'{message.from_user.first_name}, вам запрещено создавать вопросы, поскольку вы были заблокирваны за нарушение правил создания вопросов (возможно спам или запрещенный контент)')
+        return
     await state.set_state(QuestionParams.option1)
     await message.answer(f'{message.from_user.first_name}, введите первый вариант вопроса ("quit" - отменить создание)')
 
@@ -44,6 +48,6 @@ async def set_second_option(message: Message, state: FSMContext):
     else:
         await state.update_data(option2=message.text)
         data = await state.get_data()
-        await db_helper.create_question(option1=data['option1'], option2=data['option2'])
+        await db_helper.create_question(option1=data['option1'], option2=data['option2'], creator_id=message.from_user.id)
         await message.answer(f'{message.from_user.first_name}, ваш вопрос успешно создан. Теперь за него могут голосовать другие пользователи.\n\n Обратите внимание, если вопрос содержит запрещенный контент, он будет удален.')
         await state.clear()

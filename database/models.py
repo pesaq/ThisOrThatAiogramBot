@@ -9,6 +9,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     voted = Column(String)
     report_block = Column(Boolean)
+    create_block = Column(Boolean)
     admin = Column(Boolean)
 
 class Questions(Base):
@@ -19,3 +20,4 @@ class Questions(Base):
     option2 = Column(String)
     option1_points = Column(Integer)
     option2_points = Column(Integer)
+    creator_id = Column(Integer)

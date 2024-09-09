@@ -33,6 +33,24 @@ async def get_help(callback: CallbackQuery):
 /question - получить рандомный "То или Это"
 /create_question - создать свой вопрос "То или Это"''')
 
+@router.message(Command(commands=['help']))
+async def get_help(callback: CallbackQuery):
+    await db_helper.create_user(id=callback.from_user.id)
+    await callback.message.answer('''Доступные команды:
+/help - помощь
+
+/question - получить рандомный "То или Это"
+/create_question - создать свой вопрос "То или Это"
+/rules - правила''')
+
+@router.message(Command(commands=['rules']))
+async def get_rules(message: Message):
+    await db_helper.create_user(id=message.from_user.id)
+    await message.answer('''<b>Запрещено</b>:
+- спам жалобами (блокировка жалоб)
+- спам созданием вопросов/запрещенный или флуд контент в содержании вариантов вопроса (блокировка возможности создания вопросов)
+''', parse_mode='HTML')
+
 last_question_time = 0
 cooldown_period = 15
 

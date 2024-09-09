@@ -21,6 +21,12 @@ class BlockUserReport(StatesGroup):
 class UnblockUserReport(StatesGroup):
     user_id = State()
 
+class BlockUserCreate(StatesGroup):
+    user_id = State()
+
+class UnblockUserCreate(StatesGroup):
+    user_id = State()
+
 @router.callback_query(F.data == 'complain')
 async def send_report(callback: CallbackQuery, state: FSMContext):
     await db_helper.create_user(id=callback.from_user.id)
@@ -53,14 +59,18 @@ async def set_question_number(message: Message, state: FSMContext):
                 callback_data='delete_report_question'
             ),
             InlineKeyboardButton(
-                text='Заблокировать пользователя',
+                text='Заблокировать репорт',
                 callback_data='block_report_user'
+            ),
+            InlineKeyboardButton(
+                text='Заблокировать создание вопросов',
+                callback_data='block_create_user'
             )
         ]
     ])
-    await bot.send_message(settings.bots.admin_id, f'Пользователь {message.from_user.first_name} ({message.from_user.id}) '
-                                      f'отправил жалобу на вопрос №{question_info['id']}\n\nИнформация:\n\n1 - {question_info['option1']}\n\n2 - {question_info['option2']}\n\nГолоса:\n\n1 ({question_info['option1_points']})\n 2 ({question_info['option2_points']})',
-                                      reply_markup=admin_report_keyboard)
+    await bot.send_message(settings.bots.admin_id, f'Пользователь {message.from_user.first_name} (<code>{message.from_user.id}</code>) '
+                                      f'отправил жалобу на вопрос №{question_info['id']}\n\nИнформация:\n\nСоздатель вопроса: <code>{question_info['creator_id']}</code>\n\n1 - {question_info['option1']}\n\n2 - {question_info['option2']}\n\nГолоса:\n\n1 ({question_info['option1_points']})\n 2 ({question_info['option2_points']})',
+                                      reply_markup=admin_report_keyboard, parse_mode='HTML')
 
     await message.answer(f'{message.from_user.first_name}, ваша жалоба отправлена.')
     await state.clear()
@@ -125,4 +135,56 @@ async def sumbit_unblock_report_user(message: Message, state: FSMContext):
     await state.update_data(user_id=user_id)
     await db_helper.unblock_report_user(id=user_id)
     await message.answer(f'{message.from_user.first_name}, репорт пользователя {user_id} был разблокирован')
+    await state.clear()
+
+@router.callback_query(F.data == 'block_create_user')
+async def block_create_user(callback: CallbackQuery, state: FSMContext):
+    user_info = await db_helper.get_user_info(id=callback.from_user.id)
+    if user_info['admin'] is False:
+        await callback.message.answer(f'{callback.from_user.first_name}, вам недоступна данная команда')
+        return
+    await state.set_state(BlockUserCreate.user_id)
+    await callback.message.answer(f'{callback.from_user.first_name}, введите id пользователя, которому хотите заблокировать возможность создания вопросов')
+
+@router.message(BlockUserCreate.user_id)
+async def sumbit_block_create_user(message: Message, state: FSMContext):
+    user_id = message.text
+    result = await db_helper.get_user_info(id=user_id)
+    if result is None:
+        await message.answer(f'{message.from_user.first_name}, пользователя с таким id не существует')
+        await state.clear()
+        return
+    await state.update_data(user_id=user_id)
+    await db_helper.block_create_user(id=user_id)
+    admin_unblock_create_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text='Разблокировать',
+                callback_data='unblock_create_user'
+            )
+        ]
+    ])
+    await message.answer(f'{message.from_user.first_name}, возможность создания вопросов пользователю {user_id} заблокирована', reply_markup=admin_unblock_create_keyboard)
+    await state.clear()
+
+@router.callback_query(F.data == 'unblock_create_user')
+async def unblock_create_user(callback: CallbackQuery, state: FSMContext):
+    user_info = await db_helper.get_user_info(id=callback.from_user.id)
+    if user_info['admin'] is False:
+        await callback.message.answer(f'{callback.from_user.first_name}, вам недоступна данная команда')
+        return
+    await state.set_state(UnblockUserCreate.user_id)
+    await callback.message.answer(f'{callback.from_user.first_name}, введите id пользователя, которому хотите раззаблокировать возможность создания вопросов')
+
+@router.message(UnblockUserCreate.user_id)
+async def sumbit_unblock_create_user(message: Message, state: FSMContext):
+    user_id = message.text
+    result = await db_helper.get_user_info(id=user_id)
+    if result is None:
+        await message.answer(f'{message.from_user.first_name}, пользователя с таким id не существует')
+        await state.clear()
+        return
+    await state.update_data(user_id=user_id)
+    await db_helper.unblock_create_user(id=user_id)
+    await message.answer(f'{message.from_user.first_name}, возможность создания вопросов пользователю {user_id} разблокирована')
     await state.clear()
